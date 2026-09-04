@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>EU / NATO 輿情監看</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --ink: #16181d;
+    --muted: #6b7280;
+    --line: #e3e6ea;
+    --accent: #1f5fd0;
+    --accent-ink: #ffffff;
+    --chip: #eef2f9;
+    --code: #f3f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --card: #1c1f25;
+      --ink: #e8eaed;
+      --muted: #9aa2ad;
+      --line: #2b2f37;
+      --accent: #6c9bf0;
+      --accent-ink: #10131a;
+      --chip: #242832;
+      --code: #22262e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 28px 20px 56px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.6 "Segoe UI", "Microsoft JhengHei", system-ui, sans-serif;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13.5px; margin: 0 0 24px; }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .label { font-size: 12.5px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button {
+    appearance: none; border: 0; background: transparent; color: var(--ink);
+    padding: 7px 14px; font: inherit; font-size: 13.5px; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .go {
+    appearance: none; border: 0; border-radius: 10px;
+    background: var(--accent); color: var(--accent-ink);
+    font: inherit; font-size: 15.5px; font-weight: 700;
+    padding: 13px 22px; cursor: pointer; width: 100%; margin-top: 14px;
+  }
+  .go:active { transform: translateY(1px); }
+  .note { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  .warn {
+    display: none; margin-top: 12px; padding: 10px 12px;
+    background: #fff4e5; color: #7a4a00; border: 1px solid #f0d3a8;
+    border-radius: 9px; font-size: 13px;
+  }
+  @media (prefers-color-scheme: dark) {
+    .warn { background: #33270f; color: #f3d9a8; border-color: #574424; }
+  }
+  .site { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; }
+  .site:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+  .site h2 { font-size: 15px; margin: 0 0 8px; }
+  .site h2 a { color: var(--accent); text-decoration: none; }
+  .site h2 a:hover { text-decoration: underline; }
+  textarea {
+    width: 100%; min-height: 54px; resize: vertical;
+    background: var(--code); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 10px; font: 13px/1.5 ui-monospace, Consolas, monospace;
+  }
+  .q {
+    margin-top: 8px; padding: 9px 10px; background: var(--code);
+    border-radius: 8px; font: 12px/1.5 ui-monospace, Consolas, monospace;
+    color: var(--muted); word-break: break-all;
+  }
+  footer { color: var(--muted); font-size: 12.5px; margin-top: 22px; }
+  footer b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>EU / NATO 輿情監看</h1>
+  <p class="sub">一鍵開啟三站的 Google 時間篩選搜尋。關鍵字可直接編輯，會記在這台電腦上。</p>
+
+  <div class="panel">
+    <div class="row">
+      <span class="label">時間範圍</span>
+      <div class="seg" id="seg">
+        <button type="button" data-qdr="d">過去 24 小時</button>
+        <button type="button" data-qdr="w" aria-pressed="true">過去一週</button>
+        <button type="button" data-qdr="m">過去一個月</button>
+      </div>
+    </div>
+    <button class="go" id="go" type="button">開啟三個分頁</button>
+    <div class="warn" id="warn">
+      瀏覽器擋掉了部分分頁。請在網址列右側允許此頁的彈出視窗，或直接點下方各站標題。
+    </div>
+    <p class="note">
+      預設為<b>過去一週</b>：Google 收錄有延遲，用「過去 24 小時」會漏掉昨天發布、今天才被收錄的文章。
+    </p>
+  </div>
+
+  <div class="panel" id="sites"></div>
+
+  <footer>
+    <b>判讀提醒：</b>搜尋結果為空，只代表「這次查詢沒看到新項目」，
+    不代表這三站真的沒有新內容——Google 不保證每一頁都會被收錄。
+    若某站長期都是空的，先手動去該站官網列表對一次再下結論。
+  </footer>
+
+</div>
+
+<script>
+  var SITES = [
+    { name: 'EEAS（歐盟對外事務部）', domain: 'eeas.europa.eu',
+      kw: 'Taiwan;China;Chinese;PRC;NATO;drone;cables;Indo-Pacific' },
+    { name: 'Council of the EU（歐盟理事會）', domain: 'consilium.europa.eu',
+      kw: 'Taiwan;China;Chinese;PRC;NATO;drone;cables;Indo-Pacific' },
+    { name: 'NATO（北約）', domain: 'nato.int',
+      kw: 'Taiwan;China;Chinese;PRC;drone;cables;Indo-Pacific' }
+  ];
+
+  var qdr = 'w';
+
+  function load() {
+    try {
+      var raw = localStorage.getItem('eu-nato-monitor');
+      if (!raw) return;
+      var saved = JSON.parse(raw);
+      SITES.forEach(function (s) {
+        if (saved[s.domain] != null) s.kw = saved[s.domain];
+      });
+      if (saved.__qdr) qdr = saved.__qdr;
+    } catch (e) { /* file:// 可能不允許 localStorage；忽略即可 */ }
+  }
+
+  function save() {
+    try {
+      var out = { __qdr: qdr };
+      SITES.forEach(function (s) { out[s.domain] = s.kw; });
+      localStorage.setItem('eu-nato-monitor', JSON.stringify(out));
+    } catch (e) { /* 同上 */ }
+  }
+
+  function buildQuery(site) {
+    var words = site.kw.split(';')
+      .map(function (k) { return k.trim(); })
+      .filter(function (k) { return k.length > 0; })
+      .map(function (k) { return /\s|-/.test(k) ? '"' + k + '"' : k; });
+    var q = 'site:' + site.domain;
+    if (words.length === 1) q += ' ' + words[0];
+    else if (words.length > 1) q += ' (' + words.join(' OR ') + ')';
+    return q;
+  }
+
+  function buildUrl(site) {
+    return 'https://www.google.com/search?q=' +
+      encodeURIComponent(buildQuery(site)) + '&tbs=qdr:' + qdr;
+  }
+
+  function render() {
+    var host = document.getElementById('sites');
+    host.textContent = '';
+    SITES.forEach(function (site, i) {
+      var box = document.createElement('div');
+      box.className = 'site';
+
+      var h = document.createElement('h2');
+      var a = document.createElement('a');
+      a.href = buildUrl(site);
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = site.name;
+      a.id = 'link-' + i;
+      h.appendChild(a);
+      box.appendChild(h);
+
+      var ta = document.createElement('textarea');
+      ta.value = site.kw;
+      ta.spellcheck = false;
+      ta.setAttribute('aria-label', site.name + ' 關鍵字，用分號分隔');
+      ta.addEventListener('input', function () {
+        site.kw = ta.value;
+        a.href = buildUrl(site);
+        pre.textContent = buildQuery(site);
+        save();
+      });
+      box.appendChild(ta);
+
+      var pre = document.createElement('div');
+      pre.className = 'q';
+      pre.textContent = buildQuery(site);
+      box.appendChild(pre);
+
+      host.appendChild(box);
+    });
+  }
+
+  function refreshLinks() {
+    SITES.forEach(function (site, i) {
+      var a = document.getElementById('link-' + i);
+      if (a) a.href = buildUrl(site);
+    });
+  }
+
+  document.getElementById('seg').addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    qdr = btn.getAttribute('data-qdr');
+    Array.prototype.forEach.call(this.querySelectorAll('button'), function (b) {
+      b.setAttribute('aria-pressed', String(b === btn));
+    });
+    refreshLinks();
+    save();
+  });
+
+  document.getElementById('go').addEventListener('click', function () {
+    var blocked = 0;
+    SITES.forEach(function (site) {
+      var w = window.open(buildUrl(site), '_blank', 'noopener');
+      if (!w) blocked++;
+    });
+    document.getElementById('warn').style.display = blocked ? 'block' : 'none';
+  });
+
+  load();
+  Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function (b) {
+    b.setAttribute('aria-pressed', String(b.getAttribute('data-qdr') === qdr));
+  });
+  render();
+</script>
+</body>
+</html>
