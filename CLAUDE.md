@@ -42,6 +42,17 @@ Brave news 端點 ／ 深分頁加本地篩選 ／ Google Alerts ／ LLM Agent �
 （curl 三種 UA 皆同）。任何 Worker、Node 腳本或 serverless 後端都抓不到它——
 這擋掉的是一整類提案，不只是 RSS。
 
+## 未解決的問題
+
+`Taiwan`／`China`／`Indo-Pacific` 出現在 **EEAS 每一頁**的全站導覽列 HTML 裡，
+可能因此對 `site:eeas.europa.eu` 完全沒有篩選力。污染源已確認，
+但**尚未確認 Google 是否真的據此配對**（搜尋引擎通常會折價 boilerplate）。
+
+**確認之前不要改預設關鍵字。** 判定方法與修法見 `docs/AGENT_BRIEF.md` §10。
+
+替任何站設關鍵字之前，先確認那個字不在該站的全站 chrome 裡——
+這個病 NewsSearch 已經在 `NATO` × `nato.int` 上得過一次。
+
 ## 技術約束
 
 | 項目 | 規定 |

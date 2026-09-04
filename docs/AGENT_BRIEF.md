@@ -214,3 +214,75 @@ kw = "Indo-Pacific;South China Sea"
 **不要把這兩個 repo 合併。** 它們沒有共用的執行環境或部署路徑：
 一個是 Cloudflare Worker + Brave API，一個是靜態單頁 + Google UI。
 合併只會讓兩邊都變髒。
+
+---
+
+## 10. 未解決：EEAS 的導覽列可能讓三個關鍵字失去篩選力
+
+**狀態：已確認污染源存在，尚未確認 Google 是否真的據此配對。發現於 2026-09-04。**
+
+### 怎麼發現的
+
+使用者回報 EEAS 區塊搜到
+`/eeas/informal-meeting-eu-ministers-defence-press-conference-high-representative-kaja-kallas_en`，
+但「內文完全沒提到那些關鍵字」。
+
+實際查證後**該頁確實命中**，命中的是 `NATO`、`drone`、`cables` 三個字，都在可見正文裡
+（「subsea data **cables** and energy pipelines」「Ukrainian **drones** are disrupting...」）。
+所以那次搜尋沒有錯——但查證過程挖出下面這件事。
+
+### 已確認的事實
+
+`Taiwan`、`China`、`Indo-Pacific` 出現在 EEAS **每一頁**的伺服器端 HTML，
+來源是全站共用的國家選單與主題選單：
+
+```html
+<option value="/taiwan_en">Taiwan</option>
+<option value="/china_en">China</option>
+```
+
+以 curl 比對兩頁（該篇記者會 vs. 完全無關的 `about-european-external-action-service_en`），
+`taiwan_en`／`china_en`／`>Taiwan<`／`>China<` **兩頁都各出現 1 次**，
+`indo-pacific` 分別出現 2 次與 3 次。**這是 chrome，不是文章內容。**
+
+### 尚未確認的事
+
+**Google 是否真的用導覽列 boilerplate 來配對。** 搜尋引擎通常會折價這類重複區塊，
+所以問題可能根本不存在。**在確認之前不要改預設關鍵字。**
+
+判定方法（一次手動搜尋即可，不要寫程式自動化）：
+
+```
+https://www.google.com/search?q=site%3Aeeas.europa.eu+Taiwan&tbs=qdr:y
+```
+
+- 結果都在談台灣 → Google 有折價導覽列，**現況正常，不用動**
+- 結果是一堆無關頁面（人事任命、機構介紹、代表團首頁）→ 導覽列被配對，
+  `Taiwan`／`China`／`Indo-Pacific` 在此站無篩選力
+
+### 若確認有問題，怎麼修
+
+**`Chinese` 與 `PRC` 是乾淨的**——已查證，這兩個字在該頁整份 HTML 中完全不存在，
+因此它們的命中必定來自正文。可用的替換方向：
+
+| 受污染 | 乾淨替代 |
+|---|---|
+| `China` | `Chinese`、`PRC`、`Beijing` |
+| `Taiwan` | `"Taiwan Strait"`、`cross-strait` |
+| `Indo-Pacific` | 保留，但知道它可能無效 |
+
+多字詞由 `buildQuery`（行 163）自動加引號，直接寫 `Taiwan Strait` 即可。
+
+### 為什麼不急
+
+這個方向的失誤是**可承受的那一個**。若 `China` 匹配到整個網域，
+該區塊就退化成「EEAS 這週所有新頁面」——配上時間篩選仍然可用，只是雜訊變多。
+依第 2 節的原則，**過度匹配不會讓使用者漏掉東西**；
+反過來（關鍵字太嚴而漏掉相關文章）才是真正的傷害，也正是 Brave 那條路失敗的原因。
+
+### 同類前例
+
+NewsSearch 專案實測過 `NATO` 用於 `site:nato.int` 幾乎匹配整個網域、不具篩選力，
+因此那個工具的 nato.int 區塊**刻意不含 `NATO`** 這個字
+（見該 repo `findings.md` K.2）。這裡是同一個病在不同站上的複發。
+**替任何站設定關鍵字之前，先確認那個字不在該站的全站 chrome 裡。**
