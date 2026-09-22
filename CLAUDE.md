@@ -49,7 +49,9 @@ curl 三種 UA 皆回 403；**會執行 JS 的自動化瀏覽器等 18 秒仍停
 若 Google 據此配對，那個關鍵字對該站就等於不存在——而你不會發現，
 因為查詢照樣回結果，只是回的是整個網域。
 
-**驗證方法：curl 兩個「正文與該關鍵字無關」的同站頁面，grep 那個字。**
+**驗證要兩步，缺一不可。**
+
+**第一步（乾淨）：curl 兩個「正文與該關鍵字無關」的同站頁面，grep 那個字。**
 出現了就是在 chrome 裡。離線、即時、不會觸發 Google 的 bot 偵測。
 
 ```bash
@@ -57,7 +59,16 @@ curl -sS -L -A "Mozilla/5.0 ... Chrome/131.0 ..." -o a.html "<該站任一篇無
 grep -o -i "<keyword>" a.html | wc -l      # > 0 就是污染
 ```
 
-**不要用「比 Google 結果數」的比例法。** 它在 2026-09-10 給過一次錯誤結論：
+**第二步（有用）：在 Google 查一次，看頁首有沒有「找不到…的結果」那行。**
+有的話代表這個片語零命中，Google 會**自動脫掉引號退回**成裸字——
+而裸字正是污染源。一個「乾淨但零命中」的片語比原本的裸字更糟，
+因為它看起來像修好了。（`"EU-China"` 在 EEAS、`"Taiwan Strait"` 在 nato.int
+都是這樣中招的。）
+
+⚠️ **`site:` 涵蓋子網域，而子網域有自己的 chrome。** `"Asia-Pacific"` 在
+www.nato.int 乾淨，卻命中 `ndc.nato.int` 56% 的頁面（側欄分類）。子網域要另外看。
+
+**不要用「比 Google 結果數」的比例法當主要判準。** 它在 2026-09-10 給過一次錯誤結論：
 分母用了整個網域，而污染只存在於某條路徑上，86% 的污染被稀釋成 10% 的假象。
 細節見 `docs/AGENT_BRIEF.md` §10。
 
@@ -65,9 +76,11 @@ grep -o -i "<keyword>" a.html | wc -l      # > 0 就是污染
 
 - **EEAS**：`Taiwan`／`China`／`Indo-Pacific` 已確認污染（佔 `/eeas/` 的 78–86%），
   2026-09-22 已換成片語。`Chinese`／`PRC`／`NATO`／`drone`／`cables` 乾淨。
-- **nato.int**：同一個病。整站 `<option>` 選單含 `Taiwan`／`China`，導覽列含
+- **nato.int**：同一個病，而且更嚴重。整站 `<option>` 選單含 `Taiwan`／`China`，導覽列含
   「Relations with partners in the Indo-Pacific region」，2026-09-22 一併換掉。
   `NATO` 本來就刻意不含（NewsSearch `findings.md` K.2）。
+  **該站現在完全沒有台灣關鍵字**——NATO 不用 `"Taiwan Strait"`／`"cross-Strait"`，
+  留零命中片語只會退回成污染字。詳見 `docs/AGENT_BRIEF.md` §10。
 - **consilium.europa.eu**：**無法驗證**。curl 回 403，連會執行 JS 的自動化瀏覽器也過不去
   （18 秒仍停在 Checking your browser）。只能由使用者用真人瀏覽器看原始碼。
   **沒有證據之前不要動它的 `kw`。**

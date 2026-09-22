@@ -279,7 +279,9 @@ Google 確實據此配對。反例（使用者 2026-09-22 提供）：
 **教訓：比例法的分母必須是「確實帶有那段 chrome 的路徑」，不是整個網域。**
 而要知道哪些路徑帶有那段 chrome，你還是得去看 HTML——所以不如直接用下面的方法。
 
-### 正確的驗證方法：curl 兩頁對照，不要用 Google 比例
+### 驗證方法第一步：curl 兩頁對照（不要用 Google 比例法）
+
+**這一步只證明「乾淨」，不證明「有用」。第二步見下面「第三個陷阱」，缺一不可。**
 
 ```bash
 # 抓兩個「正文與該關鍵字完全無關」的同站頁面
@@ -304,6 +306,9 @@ grep -o -i "<keyword>" b.html | wc -l
 | `Chinese`／`PRC`／`NATO`／`drone`／`cables` | 0 / 0 | ✅ 乾淨 |
 | `Taiwan Strait`／`cross-Strait`／`Beijing`／`EU-China` | 0 / 0 | ✅ |
 | `the Indo-Pacific`／`Indo-Pacific region` | 0 / 0 | ✅ |
+
+⚠️ **這一步必要但不充分。** `EU-China` 在這張表上是乾淨的，
+實際上卻是零命中、會退回成污染字——見「第三個陷阱」。
 
 ⚠️ **這個方法對 `consilium.europa.eu` 不能用**——它對所有不執行 JS 的客戶端回 403（見 §3）。
 那一站只能退回比例法，而且要自己先找出正確的分母路徑。
@@ -343,21 +348,89 @@ Google 沒有「只搜正文」的操作符。`intext:`／`allintext:` 已經失
 而且更根本：**對 Google 而言導覽列就是頁面文字**，它對人類訪客也確實顯示在畫面上。
 「正文 vs. 選單」這個區分在查詢語言裡不存在。
 
-### 實際改了什麼（2026-09-22）
+### 第三個陷阱：零命中的引號片語會把污染帶回來
 
-EEAS 區塊的 `kw`：
+**這是 2026-09-22 第二輪實測才發現的，而且 curl 法看不出來。**
+
+Google 在「加引號的片語查無結果」時，會**自動脫掉引號退回**，並在頁首寫：
 
 ```
-舊： Taiwan;China;Chinese;PRC;NATO;drone;cables;Indo-Pacific
-新： Taiwan Strait;cross-Strait;Chinese;PRC;Beijing;EU-China;the Indo-Pacific;Indo-Pacific region;NATO;drone;cables
+找不到 site:eeas.europa.eu/eeas "EU-China" 的結果。
+site:eeas.europa.eu/eeas EU-China 的結果 (無引號)：
+```
+
+退回之後 `"EU-China"` 就變成 `EU` + `China` 兩個裸字，而 `China` 正是污染源——
+於是這個「乾淨」的片語回了 690 筆（82%）。**它比原本的裸字還糟，因為看起來像修好了。**
+
+同樣中招的還有 nato.int 的 `"Taiwan Strait"` 與 `"cross-Strait"`：
+NATO 在過去一年完全沒用過這兩個講法，兩個都是零命中、都會退回。
+
+**所以驗證要兩步，缺一不可：**
+
+1. **curl 兩頁 grep** → 證明字串不在 chrome 裡（乾淨）
+2. **Google 查一次，看有沒有「找不到…的結果」那行** → 證明真的有命中（有用）
+
+只做第 1 步會挑出「乾淨但零命中」的片語，而那種片語會靜默退化成污染字。
+
+### 第四個陷阱：子網域有自己的 chrome
+
+`site:nato.int` **涵蓋子網域**，而子網域的模板跟 www 不同。
+
+`"Asia-Pacific"` 在 www.nato.int 的對照頁上乾淨，但 `ndc.nato.int`
+（北約國防學院）的側欄有「PUBLICATIONS BY REGION → Asia/Pacific」，
+Google 把連字號與斜線正規化後就配上了：
+
+| 查詢（`qdr:y`） | 結果 |
+|---|---|
+| `site:ndc.nato.int` | 98 |
+| `site:ndc.nato.int "Asia-Pacific"` | **55（56%）** |
+| `site:nato.int "Asia-Pacific"` | 60 |
+
+nato.int 全站 60 筆裡有 55 筆來自 NDC——**這個字 92% 是雜訊**，已移除。
+實際症狀是週查詢的前五筆有兩筆是 NDC 的分類頁。
+
+⚠️ `ndc.nato.int` **也對 curl 回 403**，所以這一層只能用 Google 比例法查。
+替 `site:` 涵蓋子網域的站挑關鍵字時，記得子網域要另外看。
+
+### 實際改了什麼（2026-09-22，含第二輪修正）
+
+```
+EEAS 舊： Taiwan;China;Chinese;PRC;NATO;drone;cables;Indo-Pacific
+EEAS 新： Taiwan Strait;cross-Strait;Chinese;PRC;Beijing;South China Sea;the Indo-Pacific;Indo-Pacific region;NATO;drone;cables
+
+NATO 舊： Taiwan;China;Chinese;PRC;drone;cables;Indo-Pacific
+NATO 新： Chinese;PRC;Beijing;Indo-Pacific partners;South China Sea;drone;cables
 ```
 
 同時把 localStorage key 從 `eu-nato-monitor` 改成 `eu-nato-monitor-v2`，
 否則舊使用者瀏覽器裡存的舊關鍵字會蓋掉新預設值（見 §5），修了等於沒修。
 
+**每個關鍵字的實測命中數**（`qdr:y`；EEAS 基準 `/eeas/` 843，NATO 基準全站 3,800）：
+
+| 關鍵字 | EEAS | nato.int | 備註 |
+|---|---|---|---|
+| `Taiwan`（裸字） | 662 ❌ | 污染 ❌ | 已移除 |
+| `China`（裸字） | 728 ❌ | 污染 ❌ | 已移除 |
+| `Indo-Pacific`（裸字） | 728 ❌ | 污染 ❌ | 已移除 |
+| `"the Indo-Pacific"` | **76** ✅ | 污染 ❌ | NATO 導覽列含此字串 |
+| `"Indo-Pacific region"` | 6 ✅ | 污染 ❌ | 同上 |
+| `"Indo-Pacific partners"` | — | **38** ✅ | NATO 唯一可用的印太字 |
+| `"Taiwan Strait"` | 5 ✅ | **0** ❌ | NATO 不用這個講法 |
+| `"cross-Strait"` | 1 ✅ | **0** ❌ | 同上 |
+| `"South China Sea"` | 10 ✅ | 1 ✅ | |
+| `Chinese` | 10 ✅ | 76 ✅ | |
+| `PRC` | 0 ~ | 10 ✅ | EEAS 上是死字但無害（裸字不會退回） |
+| `Beijing` | 3 ✅ | 9 ✅ | |
+| `"EU-China"` | **0** ❌ | — | 退回後 690 筆，已移除 |
+| `"Asia-Pacific"` | — | 60 ❌ | 55 筆來自 ndc 側欄，已移除 |
+
+**驗收**（`qdr:w`，工具實際產生的完整查詢，皆無退回）：
+EEAS 38 筆／週、nato.int 8 筆／週。
+
 **這是一次召回換精確度的交易，使用者知情後同意的。** 代價是：
-正文只寫 `China`／`Taiwan` 而不寫 `Chinese`／`PRC`／`Beijing`／`EU-China`／`Taiwan Strait`
-的文章會被漏掉。
+正文只寫 `China`／`Taiwan` 而不寫上表那些字的文章會被漏掉。
+NATO 那一站現在**完全沒有台灣關鍵字**——因為 NATO 根本不用那些講法，
+與其留零命中的片語讓它退回成污染，不如誠實地不放。
 
 之所以這個交易還算划算：舊的 `China` 命中 `/eeas/` 的 86%，
 它並不是在提供召回，而是等同於沒有關鍵字——使用者本來就在看幾乎全部的頁面。
@@ -390,15 +463,21 @@ nato.int 的 `kw` 改成：
 
 ```
 舊： Taiwan;China;Chinese;PRC;drone;cables;Indo-Pacific
-新： Taiwan Strait;cross-Strait;Chinese;PRC;Beijing;Indo-Pacific partners;Asia-Pacific;South China Sea;drone;cables
+新： Chinese;PRC;Beijing;Indo-Pacific partners;South China Sea;drone;cables
 ```
 
 （仍然刻意不含 `NATO`，理由見 §10 開頭與 NewsSearch `findings.md` K.2。）
 
-**這一站的印太覆蓋比 EEAS 弱，要知道。** 在 NATO 的印太夥伴關係頁上，
-`the Indo-Pacific` 命中 38 次而 `"Indo-Pacific partners"` 只有 6 次——
-但前者已被導覽列污染，不能用。目前靠 `"Indo-Pacific partners"` ＋ `"Asia-Pacific"`
-＋ 中國／台海那組片語一起兜。若日後發現漏掉印太相關報導，這裡是第一個要查的地方。
+**這一站的覆蓋比 EEAS 弱兩層，要知道。**
+
+印太只剩 `"Indo-Pacific partners"`（38 筆／年）。導覽列吃掉了 `"the Indo-Pacific"`
+與 `"Indo-Pacific region"`，`"Asia-Pacific"` 則被 ndc 子網域的側欄吃掉（見「第四個陷阱」）。
+
+台灣**一個字都沒有**——NATO 過去一年完全沒用過 `"Taiwan Strait"` 或 `"cross-Strait"`，
+兩個都是零命中，留著只會退回成污染字。NATO 提到台灣時幾乎必然也提到中國，
+所以靠 `Chinese`（76）／`PRC`（10）／`Beijing`（9）兜。
+
+若日後發現漏掉印太或台灣相關報導，這兩處是第一個要查的地方。
 
 **`consilium.europa.eu`：無法驗證，關鍵字維持原狀。**
 
@@ -414,19 +493,10 @@ curl 仍回 403（`<title>Browser check - Consilium</title>`）。
 檢視原始碼搜尋關鍵字。** 在那之前不要動 consilium 的 `kw`——
 沒有證據就改，違反第 2 節的原則。
 
-### 真正還沒驗的（只剩這三件）
+### 真正還沒驗的（只剩 consilium）
 
-1. **`"the Indo-Pacific"` 在 Google 是否尊重引號內的 stop word `the`。**
-   已用 OR 群組對沖（同時放了 `"Indo-Pacific region"`），不影響現在能不能用，
-   但確認之後可以把冗餘那個拿掉。
-2. **替代片語在 Google 上的實際命中數。** curl 法證明了「乾淨」，
-   沒證明「召回夠」。兩者是不同的問題。
-3. **consilium 的污染狀況。** 只能由使用者用真人瀏覽器檢視原始碼。
+**`consilium.europa.eu` 的污染狀況。** curl 403、自動化瀏覽器也過不去，
+只能由使用者用真人瀏覽器打開該站任一篇無關文章、檢視原始碼搜關鍵字。
+在那之前不要動它的 `kw`。
 
-第 1、2 項當天卡在 Google 的 bot 驗證頁（見下）。
-
-### 附帶記錄：Google 的 bot 偵測門檻
-
-2026-09-22 在幾分鐘內送出約 15 條 `site:` 查詢後，Google 即出示驗證頁。
-**不得繞過**（見 §7）。這也是上面推薦 curl 法的理由之一，
-以及為什麼 §7 那個「排程自動查詢」的方向風險比看起來高。
+（`"the Indo-Pacific"` 的 stop word 行為與替代片語的命中數已於 2026-09-22
