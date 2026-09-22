@@ -38,20 +38,63 @@ Agent 說「沒有新東西」不構成稽核證據。
 Brave `page_age` 排序 ／ Brave `freshness` 參數 ／ 日期字串注入 ／ RSS ingestion ／
 Brave news 端點 ／ 深分頁加本地篩選 ／ Google Alerts ／ LLM Agent 自動摘要。
 
-**特別注意**：`consilium.europa.eu` 對所有不執行 JS 的客戶端回 403
-（curl 三種 UA 皆同）。任何 Worker、Node 腳本或 serverless 後端都抓不到它——
-這擋掉的是一整類提案，不只是 RSS。
+**特別注意**：`consilium.europa.eu` 擋的是**自動化指紋，不只是「不執行 JS」**。
+curl 三種 UA 皆回 403；**會執行 JS 的自動化瀏覽器等 18 秒仍停在
+"Checking your browser"**（2026-09-22 實測）。所以 Worker、Node 腳本、serverless
+**以及 Playwright／Puppeteer** 都抓不到它——這擋掉的是一整類提案，不只是 RSS。
 
-## 未解決的問題
+## 替任何站設關鍵字之前，先確認那個字還有篩選力
 
-`Taiwan`／`China`／`Indo-Pacific` 出現在 **EEAS 每一頁**的全站導覽列 HTML 裡，
-可能因此對 `site:eeas.europa.eu` 完全沒有篩選力。污染源已確認，
-但**尚未確認 Google 是否真的據此配對**（搜尋引擎通常會折價 boilerplate）。
+機構網站的全站導覽列與選單會把國名、主題名塞進**每一頁**的 HTML。
+若 Google 據此配對，那個關鍵字對該站就等於不存在——而你不會發現，
+因為查詢照樣回結果，只是回的是整個網域。
 
-**確認之前不要改預設關鍵字。** 判定方法與修法見 `docs/AGENT_BRIEF.md` §10。
+**驗證方法：curl 兩個「正文與該關鍵字無關」的同站頁面，grep 那個字。**
+出現了就是在 chrome 裡。離線、即時、不會觸發 Google 的 bot 偵測。
 
-替任何站設關鍵字之前，先確認那個字不在該站的全站 chrome 裡——
-這個病 NewsSearch 已經在 `NATO` × `nato.int` 上得過一次。
+```bash
+curl -sS -L -A "Mozilla/5.0 ... Chrome/131.0 ..." -o a.html "<該站任一篇無關文章>"
+grep -o -i "<keyword>" a.html | wc -l      # > 0 就是污染
+```
+
+**不要用「比 Google 結果數」的比例法。** 它在 2026-09-10 給過一次錯誤結論：
+分母用了整個網域，而污染只存在於某條路徑上，86% 的污染被稀釋成 10% 的假象。
+細節見 `docs/AGENT_BRIEF.md` §10。
+
+已知狀況：
+
+- **EEAS**：`Taiwan`／`China`／`Indo-Pacific` 已確認污染（佔 `/eeas/` 的 78–86%），
+  2026-09-22 已換成片語。`Chinese`／`PRC`／`NATO`／`drone`／`cables` 乾淨。
+- **nato.int**：同一個病。整站 `<option>` 選單含 `Taiwan`／`China`，導覽列含
+  「Relations with partners in the Indo-Pacific region」，2026-09-22 一併換掉。
+  `NATO` 本來就刻意不含（NewsSearch `findings.md` K.2）。
+- **consilium.europa.eu**：**無法驗證**。curl 回 403，連會執行 JS 的自動化瀏覽器也過不去
+  （18 秒仍停在 Checking your browser）。只能由使用者用真人瀏覽器看原始碼。
+  **沒有證據之前不要動它的 `kw`。**
+
+### 逃開污染的方法是加長片語，不是換窄的同義字
+
+污染通常是**固定字串**（選單項、連結文字）。任何不是它子字串的片語都乾淨：
+裸字 `Taiwan` 中招，`"Taiwan Strait"` 不會；`EU Indo-Pacific Strategy` 中招，
+`"the Indo-Pacific"` 不會。
+
+⚠️ **但安全片語逐站不同，不能跨站沿用。** NATO 的導覽列寫的是
+「Relations with partners in the Indo-Pacific region」，所以在 EEAS 安全的
+`"the Indo-Pacific"` 與 `"Indo-Pacific region"` 在 nato.int **兩個都中招**。
+每一站都要拿該站的頁面重驗一次。
+
+**但 Google 會把所有格與標點正規化掉**，所以片語必須含第二個實詞——
+`China's` 會被還原成 `China` 又中招，`"EU-China"` 才安全。
+
+`intext:`／`allintext:` 不能用來只搜正文，已實測失效（§10 有數據）。
+
+### 一般情況下把關鍵字換窄仍然是錯的
+
+上面那個 EEAS 的例子是特例：`China` 命中該路徑 86%，它不是在提供召回，
+而是等同於沒有關鍵字，所以換掉它不算損失。
+
+**沒有實測證明失去篩選力之前，不要為了「減少雜訊」把關鍵字換窄。**
+依「漏掉比抓錯嚴重」的原則，那是拿確定的召回損失換不確定的清爽。
 
 ## 技術約束
 

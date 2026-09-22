@@ -3,7 +3,7 @@
 **先讀完這份再動 `index.html`。** 這個專案的形狀是四條死路換來的，
 文件的主要目的不是說明它做了什麼，而是**阻止你重走那四條路**。
 
-最後更新：2026-09-04
+最後更新：2026-09-22
 
 ---
 
@@ -70,11 +70,16 @@
 ### consilium.europa.eu 的 403（重要，會擋掉很多提案）
 
 curl 預設 UA、Chrome UA、Googlebot UA **三種都被擋**，所以不是 UA 過濾，
-是 JS／指紋挑戰。內建瀏覽器停在 "Checking your browser" 超過 15 秒未通過。
+是 JS／指紋挑戰。2026-09-22 複驗仍是 403，`<title>Browser check - Consilium</title>`。
+
+**擋的是自動化指紋，不只是「不執行 JS」。** 會執行 JS 的自動化瀏覽器等 18 秒
+仍停在 "Checking your browser before accessing a GSC Managed Website"（2026-09-22 實測）。
 
 **任何「後端直接抓 consilium」的設計都不可行**，包含 Cloudflare Worker、
-Node 腳本、serverless function——它們都不執行 JS。只有真人瀏覽器過得去。
+Node 腳本、serverless function，**以及 Playwright／Puppeteer 這類自動化瀏覽器**。
+只有真人手動操作的瀏覽器過得去。
 
+這也表示 §10 那套 curl 驗證法對這一站用不了——見 §10 結尾。
 ---
 
 ## 4. 檔案結構
@@ -128,7 +133,7 @@ kw = "Indo-Pacific;South China Sea"
 
 改 `SITES` 裡的 `kw`。注意**使用者瀏覽器裡的 localStorage 會覆蓋預設值**
 （`load()` 行 143），所以改了預設之後，老使用者不會看到變化。
-若要強制更新，得改 localStorage 的 key 名稱（目前是 `eu-nato-monitor`）。
+若要強制更新，得改 localStorage 的 key 名稱（目前是 `eu-nato-monitor-v2`，§10 那次改過一輪）。
 
 ### 加時間範圍選項
 
@@ -217,72 +222,211 @@ kw = "Indo-Pacific;South China Sea"
 
 ---
 
-## 10. 未解決：EEAS 的導覽列可能讓三個關鍵字失去篩選力
+## 10. EEAS 導覽列確實讓三個關鍵字失去篩選力（已修）
 
-**狀態：已確認污染源存在，尚未確認 Google 是否真的據此配對。發現於 2026-09-04。**
+**狀態：成立，已於 2026-09-22 修掉。**
+時序：2026-09-04 提出懷疑 → 09-10 **誤判為「不成立」** → 09-22 使用者拿反例推翻，確認成立。
 
-### 怎麼發現的
+**先讀下面那段「09-10 為什麼會判錯」**——那個錯誤的驗證方法看起來很有說服力，
+不寫下來的話很容易有人再用一次。
 
-使用者回報 EEAS 區塊搜到
-`/eeas/informal-meeting-eu-ministers-defence-press-conference-high-representative-kaja-kallas_en`，
-但「內文完全沒提到那些關鍵字」。
+### 機制：一個固定字串，不是零散污染
 
-實際查證後**該頁確實命中**，命中的是 `NATO`、`drone`、`cables` 三個字，都在可見正文裡
-（「subsea data **cables** and energy pipelines」「Ukrainian **drones** are disrupting...」）。
-所以那次搜尋沒有錯——但查證過程挖出下面這件事。
-
-### 已確認的事實
-
-`Taiwan`、`China`、`Indo-Pacific` 出現在 EEAS **每一頁**的伺服器端 HTML，
-來源是全站共用的國家選單與主題選單：
+EEAS 的頂端 mega dropdown（Regional policies → See also）在**每一個 `/eeas/*` 頁面**
+都放了這一行：
 
 ```html
-<option value="/taiwan_en">Taiwan</option>
+<div class="col-md-6 paragraph paragraph--type--mega-dropdown-section ...">
+  <a href="/eu-indo-pacific-strategy-topic_en">EU Indo-Pacific Strategy</a>
+```
+
+另有一個國家選單：
+
+```html
 <option value="/china_en">China</option>
+<option value="/taiwan_en">Taiwan</option>
 ```
 
-以 curl 比對兩頁（該篇記者會 vs. 完全無關的 `about-european-external-action-service_en`），
-`taiwan_en`／`china_en`／`>Taiwan<`／`>China<` **兩頁都各出現 1 次**，
-`indo-pacific` 分別出現 2 次與 3 次。**這是 chrome，不是文章內容。**
+Google 確實據此配對。反例（使用者 2026-09-22 提供）：
 
-### 尚未確認的事
+<https://www.eeas.europa.eu/eeas/opening-remarks-un-side-event-humanitarian-diplomacy-safeguards-international-humanitarian-law_en>
 
-**Google 是否真的用導覽列 boilerplate 來配對。** 搜尋引擎通常會折價這類重複區塊，
-所以問題可能根本不存在。**在確認之前不要改預設關鍵字。**
-
-判定方法（一次手動搜尋即可，不要寫程式自動化）：
+這頁正文完全沒提印太，整份 HTML 裡 `Indo-Pacific` 只出現 2 次、都在上面那個選單連結。
+它卻出現在 `site:eeas.europa.eu/eeas "Indo-Pacific"` 的結果裡，
+而且 **Google 自己產生的摘要就是那段選單文字**：
 
 ```
-https://www.google.com/search?q=site%3Aeeas.europa.eu+Taiwan&tbs=qdr:y
+... Indo-Pacific Strategy · Election ... Opening remarks for the UN Side Event on ...
 ```
 
-- 結果都在談台灣 → Google 有折價導覽列，**現況正常，不用動**
-- 結果是一堆無關頁面（人事任命、機構介紹、代表團首頁）→ 導覽列被配對，
-  `Taiwan`／`China`／`Indo-Pacific` 在此站無篩選力
+「Indo-Pacific Strategy · Election」是下拉選單相鄰的兩個項目。鐵證。
 
-### 若確認有問題，怎麼修
+### 09-10 為什麼會判錯：分母用錯了
 
-**`Chinese` 與 `PRC` 是乾淨的**——已查證，這兩個字在該頁整份 HTML 中完全不存在，
-因此它們的命中必定來自正文。可用的替換方向：
+當時比的是**全站**，看起來很乾淨：
 
-| 受污染 | 乾淨替代 |
+| | 全站 `site:eeas.europa.eu` | 正確的 `site:eeas.europa.eu/eeas` |
+|---|---|---|
+| 基準頁數 | 7,210 | **843** |
+| `Taiwan` | 703（10%）✅ 看起來正常 | 662（**78%**）❌ |
+| `China` | 958（13%）✅ | 728（**86%**）❌ |
+| `"Indo-Pacific"` | 730（10%）✅ | 728（**86%**）❌ |
+
+**7,210 之中絕大多數是 `/delegations/*` 子站，那些頁用不同的模板、根本沒有這個 mega dropdown**
+（實測 `delegations/jordan_en` 的 `indo-pacific` 出現次數為 0）。
+真正在發新聞的 `/eeas/*` 只佔全站約 12%，於是 86% 的污染被稀釋成 10% 的假象。
+
+**教訓：比例法的分母必須是「確實帶有那段 chrome 的路徑」，不是整個網域。**
+而要知道哪些路徑帶有那段 chrome，你還是得去看 HTML——所以不如直接用下面的方法。
+
+### 正確的驗證方法：curl 兩頁對照，不要用 Google 比例
+
+```bash
+# 抓兩個「正文與該關鍵字完全無關」的同站頁面
+curl -sS -L -A "Mozilla/5.0 ... Chrome/131.0 ..." -o a.html "<該站任一篇無關文章>"
+curl -sS -L -A "Mozilla/5.0 ... Chrome/131.0 ..." -o b.html "<該站的機構介紹頁>"
+
+# 關鍵字若出現在這兩頁，它就在全站 chrome 裡
+grep -o -i "<keyword>" a.html | wc -l
+grep -o -i "<keyword>" b.html | wc -l
+```
+
+比 Google 比例法好在四點：離線、即時、**因果直接**（直接看字串在不在 chrome 裡，
+而不是從排名回推）、而且**不會觸發 bot 偵測**。
+
+實測結果（對照頁：那篇 UN 開場致詞 ＋ `about-european-external-action-service_en`）：
+
+| 關鍵字 | 對照頁命中 | 判定 |
+|---|---|---|
+| `Taiwan` | 2 / 2 | ❌ 在 chrome 裡 |
+| `China` | 4 / 4 | ❌ |
+| `Indo-Pacific` | 2 / 3 | ❌ |
+| `Chinese`／`PRC`／`NATO`／`drone`／`cables` | 0 / 0 | ✅ 乾淨 |
+| `Taiwan Strait`／`cross-Strait`／`Beijing`／`EU-China` | 0 / 0 | ✅ |
+| `the Indo-Pacific`／`Indo-Pacific region` | 0 / 0 | ✅ |
+
+⚠️ **這個方法對 `consilium.europa.eu` 不能用**——它對所有不執行 JS 的客戶端回 403（見 §3）。
+那一站只能退回比例法，而且要自己先找出正確的分母路徑。
+
+### 兩個會咬人的細節
+
+**1. 污染是固定字串，所以「加長片語」就能逃掉。**
+`Indo-Pacific` 在無關頁面上只以 `EU Indo-Pacific Strategy` 出現，
+所以任何**不是它子字串**的片語都是乾淨的。`Taiwan`／`China` 在選單裡是裸字，
+所以任何兩字以上的片語都乾淨。
+
+`"the Indo-Pacific"` 是這裡召回最高的選擇——導覽字串沒有 `the`，
+而英文正文講這個區域幾乎都帶定冠詞（EEAS 印太主題頁：`Indo-Pacific` 共 72 次，
+其中 `the Indo-Pacific` 20 次、導覽字串 11 次）。
+
+**2. 但 Google 的詞形正規化會把片語打回原形。**
+`China's` 在 HTML 裡是乾淨的，但 Google 會把所有格還原成 `China` → 又中污染。
+**所以替代片語必須含第二個實詞**（`"Taiwan Strait"`、`"EU-China"`、`"Indo-Pacific region"`），
+不能靠所有格或標點。
+
+同理，`"the Indo-Pacific"` 依賴 Google 在引號內尊重 stop word `the`——
+這一點**尚未實測**（Google 當時已對本機 IP 出 bot 驗證頁）。
+因此 OR 群組裡同時放了 `"Indo-Pacific region"` 當保險。OR 群組多放一個片語成本為零。
+
+### `intext:` 不能用（不要再試）
+
+Google 沒有「只搜正文」的操作符。`intext:`／`allintext:` 已經失效：
+
+| 查詢（皆 `qdr:y`） | 結果 |
 |---|---|
-| `China` | `Chinese`、`PRC`、`Beijing` |
-| `Taiwan` | `"Taiwan Strait"`、`cross-strait` |
-| `Indo-Pacific` | 保留，但知道它可能無效 |
+| `site:eeas.europa.eu/eeas "Indo-Pacific"` | 728 |
+| `site:eeas.europa.eu/eeas intext:"Indo-Pacific"` | **0** |
+| `site:eeas.europa.eu/eeas intext:Indo-Pacific` | **1** |
 
-多字詞由 `buildQuery`（行 163）自動加引號，直接寫 `Taiwan Strait` 即可。
+0 筆不是過濾成功，是查詢被打壞——該站顯然有數百頁正文真的在談印太。
 
-### 為什麼不急
+而且更根本：**對 Google 而言導覽列就是頁面文字**，它對人類訪客也確實顯示在畫面上。
+「正文 vs. 選單」這個區分在查詢語言裡不存在。
 
-這個方向的失誤是**可承受的那一個**。若 `China` 匹配到整個網域，
-該區塊就退化成「EEAS 這週所有新頁面」——配上時間篩選仍然可用，只是雜訊變多。
-依第 2 節的原則，**過度匹配不會讓使用者漏掉東西**；
-反過來（關鍵字太嚴而漏掉相關文章）才是真正的傷害，也正是 Brave 那條路失敗的原因。
+### 實際改了什麼（2026-09-22）
 
-### 同類前例
+EEAS 區塊的 `kw`：
 
-NewsSearch 專案實測過 `NATO` 用於 `site:nato.int` 幾乎匹配整個網域、不具篩選力，
-因此那個工具的 nato.int 區塊**刻意不含 `NATO`** 這個字
-（見該 repo `findings.md` K.2）。這裡是同一個病在不同站上的複發。
-**替任何站設定關鍵字之前，先確認那個字不在該站的全站 chrome 裡。**
+```
+舊： Taiwan;China;Chinese;PRC;NATO;drone;cables;Indo-Pacific
+新： Taiwan Strait;cross-Strait;Chinese;PRC;Beijing;EU-China;the Indo-Pacific;Indo-Pacific region;NATO;drone;cables
+```
+
+同時把 localStorage key 從 `eu-nato-monitor` 改成 `eu-nato-monitor-v2`，
+否則舊使用者瀏覽器裡存的舊關鍵字會蓋掉新預設值（見 §5），修了等於沒修。
+
+**這是一次召回換精確度的交易，使用者知情後同意的。** 代價是：
+正文只寫 `China`／`Taiwan` 而不寫 `Chinese`／`PRC`／`Beijing`／`EU-China`／`Taiwan Strait`
+的文章會被漏掉。
+
+之所以這個交易還算划算：舊的 `China` 命中 `/eeas/` 的 86%，
+它並不是在提供召回，而是等同於沒有關鍵字——使用者本來就在看幾乎全部的頁面。
+
+**但這條原則沒有變：一般情況下把關鍵字換窄是錯的方向**（見 §2）。
+只有在實測證明某個字已經失去篩選力時，換掉它才不算損失。
+
+### 另外兩站的結果（2026-09-22 同日驗完）
+
+**`nato.int`：同一個病，已一併修掉。**
+
+對照頁用 nato.int 的 **404 頁**（純 chrome、零正文，是最理想的對照組）
+與「創始條約」頁。legacy 的 `/cps/en/natohq/topics_*.htm` 網址會 301 導到
+新的 `/en/*` 結構並送出相同的 chrome，所以**整站都帶污染**。
+
+| 關鍵字 | 404 頁 / 條約頁 | 判定 |
+|---|---|---|
+| `Taiwan` | 2 / 2 | ❌ `<option value="Taiwan">` |
+| `China` | 6 / 6 | ❌ 同上，另有 Hong Kong／Macao SAR China |
+| `Indo-Pacific` | 4 / 4 | ❌ 見下 |
+| `Chinese`／`PRC`／`drone`／`cables` | 0 / 0 | ✅ |
+
+⚠️ **關鍵教訓：安全片語是逐站不同的。**
+NATO 的導覽列寫的是「Relations with partners **in the Indo-Pacific region**」，
+所以 EEAS 那邊安全的 `"the Indo-Pacific"` 與 `"Indo-Pacific region"`
+**在 NATO 站兩個都中招**。替某站挑片語時，必須拿**該站**的頁面重驗一次，
+不能沿用另一站的結論。
+
+nato.int 的 `kw` 改成：
+
+```
+舊： Taiwan;China;Chinese;PRC;drone;cables;Indo-Pacific
+新： Taiwan Strait;cross-Strait;Chinese;PRC;Beijing;Indo-Pacific partners;Asia-Pacific;South China Sea;drone;cables
+```
+
+（仍然刻意不含 `NATO`，理由見 §10 開頭與 NewsSearch `findings.md` K.2。）
+
+**這一站的印太覆蓋比 EEAS 弱，要知道。** 在 NATO 的印太夥伴關係頁上，
+`the Indo-Pacific` 命中 38 次而 `"Indo-Pacific partners"` 只有 6 次——
+但前者已被導覽列污染，不能用。目前靠 `"Indo-Pacific partners"` ＋ `"Asia-Pacific"`
+＋ 中國／台海那組片語一起兜。若日後發現漏掉印太相關報導，這裡是第一個要查的地方。
+
+**`consilium.europa.eu`：無法驗證，關鍵字維持原狀。**
+
+curl 仍回 403（`<title>Browser check - Consilium</title>`）。
+比 §3 記錄的更嚴格的是：**內建的自動化瀏覽器會執行 JS，等 18 秒仍停在
+"Checking your browser before accessing a GSC Managed Website"。**
+所以它擋的是自動化指紋，不只是「不執行 JS 的客戶端」。
+
+這表示 §10 這套 curl 驗證法**對 consilium 完全用不了**，而比例法也不可靠
+（要先知道哪條路徑帶 chrome，那又得讀 HTML）。
+
+**目前唯一可行的驗法是使用者自己用真人瀏覽器打開該站任一篇無關文章，
+檢視原始碼搜尋關鍵字。** 在那之前不要動 consilium 的 `kw`——
+沒有證據就改，違反第 2 節的原則。
+
+### 真正還沒驗的（只剩這三件）
+
+1. **`"the Indo-Pacific"` 在 Google 是否尊重引號內的 stop word `the`。**
+   已用 OR 群組對沖（同時放了 `"Indo-Pacific region"`），不影響現在能不能用，
+   但確認之後可以把冗餘那個拿掉。
+2. **替代片語在 Google 上的實際命中數。** curl 法證明了「乾淨」，
+   沒證明「召回夠」。兩者是不同的問題。
+3. **consilium 的污染狀況。** 只能由使用者用真人瀏覽器檢視原始碼。
+
+第 1、2 項當天卡在 Google 的 bot 驗證頁（見下）。
+
+### 附帶記錄：Google 的 bot 偵測門檻
+
+2026-09-22 在幾分鐘內送出約 15 條 `site:` 查詢後，Google 即出示驗證頁。
+**不得繞過**（見 §7）。這也是上面推薦 curl 法的理由之一，
+以及為什麼 §7 那個「排程自動查詢」的方向風險比看起來高。

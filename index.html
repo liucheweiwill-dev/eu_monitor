@@ -131,18 +131,18 @@
 <script>
   var SITES = [
     { name: 'EEAS（歐盟對外事務部）', domain: 'eeas.europa.eu',
-      kw: 'Taiwan;China;Chinese;PRC;NATO;drone;cables;Indo-Pacific' },
+      kw: 'Taiwan Strait;cross-Strait;Chinese;PRC;Beijing;EU-China;the Indo-Pacific;Indo-Pacific region;NATO;drone;cables' },
     { name: 'Council of the EU（歐盟理事會）', domain: 'consilium.europa.eu',
       kw: 'Taiwan;China;Chinese;PRC;NATO;drone;cables;Indo-Pacific' },
     { name: 'NATO（北約）', domain: 'nato.int',
-      kw: 'Taiwan;China;Chinese;PRC;drone;cables;Indo-Pacific' }
+      kw: 'Taiwan Strait;cross-Strait;Chinese;PRC;Beijing;Indo-Pacific partners;Asia-Pacific;South China Sea;drone;cables' }
   ];
 
   var qdr = 'w';
 
   function load() {
     try {
-      var raw = localStorage.getItem('eu-nato-monitor');
+      var raw = localStorage.getItem('eu-nato-monitor-v2');
       if (!raw) return;
       var saved = JSON.parse(raw);
       SITES.forEach(function (s) {
@@ -156,7 +156,7 @@
     try {
       var out = { __qdr: qdr };
       SITES.forEach(function (s) { out[s.domain] = s.kw; });
-      localStorage.setItem('eu-nato-monitor', JSON.stringify(out));
+      localStorage.setItem('eu-nato-monitor-v2', JSON.stringify(out));
     } catch (e) { /* 同上 */ }
   }
 
