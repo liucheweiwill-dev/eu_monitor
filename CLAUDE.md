@@ -36,7 +36,13 @@ Agent 說「沒有新東西」不構成稽核證據。
 ## 不要重試的（證據見 `docs/AGENT_BRIEF.md` §3）
 
 Brave `page_age` 排序 ／ Brave `freshness` 參數 ／ 日期字串注入 ／ RSS ingestion ／
-Brave news 端點 ／ 深分頁加本地篩選 ／ Google Alerts ／ LLM Agent 自動摘要。
+Brave news 端點 ／ 深分頁加本地篩選 ／ Google Alerts ／ LLM Agent 自動摘要 ／
+**三站合成一條查詢、只開一個分頁** ／ Google 的 `&num=100`。
+
+最後兩條特別容易被當成「優化」：三個分頁合成一個看起來完全合理，
+但實測巢狀的 `(site:A (…)) OR (site:B (…))` 會**整條回 0 筆、連警告都沒有**——
+使用者會以為這週三站都沒新東西。`&num=100`（一頁顯示全部）Google 已經不接受，
+照樣 10 筆一頁。兩者皆 2026-09-23 實測，細節見 `docs/AGENT_BRIEF.md` §3。
 
 **特別注意**：`consilium.europa.eu` 擋的是**自動化指紋，不只是「不執行 JS」**。
 curl 三種 UA 皆回 403；**會執行 JS 的自動化瀏覽器等 18 秒仍停在
