@@ -51,6 +51,14 @@ curl 三種 UA 皆回 403；**會執行 JS 的自動化瀏覽器等 18 秒仍停
 
 ## 替任何站設關鍵字之前，先確認那個字還有篩選力
 
+> **2026-09-24 起，三站的預設關鍵字刻意包含導覽列裡就有的字（Taiwan、China、Indo-Pacific），
+> 由使用者指定。** 9/22 換成片語，是因為當時沒辦法分辨「正文命中」和「導覽列命中」，
+> 只好在 Google 那層就把污染字拿掉——那是召回換精確度的交易。現在
+> [eu_verify](https://liucheweiwill-dev.github.io/eu_verify/) 會拿每站的 404 頁當基準線，
+> 逐頁分出導覽列命中，使用者選擇把召回換回來：Google 回傳幾乎所有頁面，篩選交給 eu_verify。
+> **不要以「污染」為由把這些字換回片語。** 本節的驗證方法仍然成立，
+> 但只在使用者要求 Google 那層也要過濾時才用得上。來龍去脈見 `docs/AGENT_BRIEF.md` §10 最後一節。
+
 機構網站的全站導覽列與選單會把國名、主題名塞進**每一頁**的 HTML。
 若 Google 據此配對，那個關鍵字對該站就等於不存在——而你不會發現，
 因為查詢照樣回結果，只是回的是整個網域。
@@ -80,16 +88,20 @@ www.nato.int 乾淨，卻命中 `ndc.nato.int` 56% 的頁面（側欄分類）�
 
 已知狀況：
 
-- **EEAS**：`Taiwan`／`China`／`Indo-Pacific` 已確認污染（佔 `/eeas/` 的 78–86%），
-  2026-09-22 已換成片語。`Chinese`／`PRC`／`NATO`／`drone`／`cables` 乾淨。
+- **EEAS**：`Taiwan`／`China`／`Indo-Pacific` 已確認污染（佔 `/eeas/` 的 78–86%）。
+  2026-09-22 換成片語，**2026-09-24 依使用者決定換回單字**
+  （現行 `Taiwan;china;Chinese;PRC;Beijing;EU-China;Indo-Pacific;NATO;drone;cables`）。
+  `Chinese`／`PRC`／`NATO`／`drone`／`cables` 乾淨。
 - **nato.int**：同一個病，而且更嚴重。整站 `<option>` 選單含 `Taiwan`／`China`，導覽列含
-  「Relations with partners in the Indo-Pacific region」，2026-09-22 一併換掉。
-  `NATO` 本來就刻意不含（NewsSearch `findings.md` K.2）。
-  **該站現在完全沒有台灣關鍵字**——NATO 不用 `"Taiwan Strait"`／`"cross-Strait"`，
-  留零命中片語只會退回成污染字。詳見 `docs/AGENT_BRIEF.md` §10。
+  「Relations with partners in the Indo-Pacific region」。2026-09-22 換成片語，
+  **2026-09-24 依使用者決定換回**
+  （現行 `Taiwan;cross-Strait;China;Chinese;PRC;Beijing;Indo-Pacific;Asia-Pacific;South China Sea;drone;cables`）。
+  `NATO` 仍刻意不含（NewsSearch `findings.md` K.2）。`Asia-Pacific` 會帶進 `ndc.nato.int` 側欄的雜訊；
+  `cross-Strait` 在 NATO 是零命中片語，但跟裸字同組，就算退回也只是退成本來就在清單裡的字。
+  詳見 `docs/AGENT_BRIEF.md` §10。
 - **consilium.europa.eu**：**無法驗證**。curl 回 403，連會執行 JS 的自動化瀏覽器也過不去
-  （18 秒仍停在 Checking your browser）。只能由使用者用真人瀏覽器看原始碼。
-  **沒有證據之前不要動它的 `kw`。**
+  （18 秒仍停在 Checking your browser）。2026-09-24 依使用者指定改成跟 EEAS 同一組。
+  它的文件 PDF 放在 `data.consilium.europa.eu`，那個子網域沒擋（curl 回 200），但 eu_verify 讀不了 PDF。
 
 ### 逃開污染的方法是加長片語，不是換窄的同義字
 
@@ -109,8 +121,9 @@ www.nato.int 乾淨，卻命中 `ndc.nato.int` 56% 的頁面（側欄分類）�
 
 ### 一般情況下把關鍵字換窄仍然是錯的
 
-上面那個 EEAS 的例子是特例：`China` 命中該路徑 86%，它不是在提供召回，
-而是等同於沒有關鍵字，所以換掉它不算損失。
+上面那個 EEAS 的例子是特例：`China` 命中該路徑 86%，它在 Google 那層不提供篩選，
+所以 9/22 判斷換掉它可以接受。但那筆交易有代價——正文只寫 China／Taiwan 的文章會被漏掉
+（AGENT_BRIEF §10 有記）。有了 eu_verify 之後，使用者在 2026-09-24 把它換回來了（見本節開頭）。
 
 **沒有實測證明失去篩選力之前，不要為了「減少雜訊」把關鍵字換窄。**
 依「漏掉比抓錯嚴重」的原則，那是拿確定的召回損失換不確定的清爽。

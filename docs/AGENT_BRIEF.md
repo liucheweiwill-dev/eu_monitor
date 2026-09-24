@@ -3,7 +3,7 @@
 **先讀完這份再動 `index.html`。** 這個專案的形狀是四條死路換來的，
 文件的主要目的不是說明它做了什麼，而是**阻止你重走那四條路**。
 
-最後更新：2026-09-22
+最後更新：2026-09-24
 
 ---
 
@@ -233,7 +233,8 @@ kw = "Indo-Pacific;South China Sea"
 
 ## 10. EEAS 導覽列確實讓三個關鍵字失去篩選力（已修）
 
-**狀態：成立，已於 2026-09-22 修掉。**
+**狀態：成立。2026-09-22 用換片語的方式修掉；2026-09-24 使用者改用另一種做法——
+換回單字、由 eu_verify 逐頁分出導覽列命中（見本節最後一小節）。**
 時序：2026-09-04 提出懷疑 → 09-10 **誤判為「不成立」** → 09-22 使用者拿反例推翻，確認成立。
 
 **先讀下面那段「09-10 為什麼會判錯」**——那個錯誤的驗證方法看起來很有說服力，
@@ -508,4 +509,34 @@ curl 仍回 403（`<title>Browser check - Consilium</title>`）。
 只能由使用者用真人瀏覽器打開該站任一篇無關文章、檢視原始碼搜關鍵字。
 在那之前不要動它的 `kw`。
 
-（`"the Indo-Pacific"` 的 stop word 行為與替代片語的命中數已於 2026-09-22
+（`"the Indo-Pacific"` 的 stop word 行為與替代片語的命中數已於 2026-09-22 第二輪實測，數字見上表。）
+
+### 2026-09-24：三站換回單字，篩選交給 eu_verify（使用者決定）
+
+**9/22 那筆「召回換精確度」的交易，使用者在有了 eu_verify 之後換回來了。**
+
+換片語的前提是：沒辦法分辨一頁是「正文提到 Taiwan」還是「只有導覽列有 Taiwan」，
+所以只好在 Google 那層就把污染字拿掉，代價是正文只寫 China／Taiwan 的文章會被漏掉。
+eu_verify（<https://github.com/liucheweiwill-dev/eu_verify>）拿每站的 404 頁（純 chrome、零正文）
+當基準線，逐頁比對關鍵字次數：超過基準線的才算正文命中，其餘標成「只在導覽列」。
+篩選既然已經能在頁面層級做，使用者選擇召回優先，把字換回來：
+
+```
+EEAS、consilium： Taiwan;china;Chinese;PRC;Beijing;EU-China;Indo-Pacific;NATO;drone;cables
+nato.int：        Taiwan;cross-Strait;China;Chinese;PRC;Beijing;Indo-Pacific;Asia-Pacific;South China Sea;drone;cables
+```
+
+要知道的後果：
+
+- **Google 那層幾乎不過濾了。** 兩站每一頁都有國家選單，查詢會回傳幾乎所有新頁面
+  （2026-09-24 過去 24 小時：EEAS 18 筆，其中 12 筆經 eu_verify 判定只在導覽列）。
+  **只用 eu_monitor、不經 eu_verify 時，看到的就是該站那段期間的幾乎全部頁面。**
+- 本節前面的污染分析**仍然正確**——正是因為那些字在導覽列裡，eu_verify 的相減才有必要。
+  **不要以「污染」為由再把字換成片語**；那套方法只在使用者要求 Google 那層也要過濾時才適用。
+- `Asia-Pacific` 會帶進 `ndc.nato.int` 側欄的雜訊（見「第四個陷阱」）；ndc 對 curl 回 403，
+  那些頁面在 eu_verify 裡會是「無法檢查」。
+- `cross-Strait` 在 NATO 是零命中片語。它跟裸字放在同一個 OR 群組裡，
+  就算觸發「脫引號退回」，退成的也是本來就在清單裡的字，不會多帶進污染。
+- consilium 的污染狀況仍然無法驗證，這次是依使用者指定一起改。
+- localStorage key 沒有換。使用者自己的瀏覽器本來就存著 EEAS 這組；
+  NATO 與 consilium 兩格存的是舊值，要使用者自己在頁面上貼一次（存過的值會蓋掉預設值，見 §5）。
